@@ -137,8 +137,7 @@ for raw_q in tqdm(questions, desc="Processing Questions"): # Add progress bar
         results["unanswerable"]["total"] += 1
 
     # --- 1. Retrieval (Bi-Encoder) ---
-    # FIX 3: ADD INSTRUCTION PREFIX FOR QWEN
-    # Qwen-Embedding is asymmetric; it needs to know this is a "Query" looking for an answer.
+
     instruction = "Instruct: Given a web search query, retrieve relevant passages that answer the query.\nQuery: "
     q_emb = embedder.encode([instruction + question], normalize_embeddings=True)[0]
     
