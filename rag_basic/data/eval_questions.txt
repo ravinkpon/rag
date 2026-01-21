@@ -1,0 +1,11 @@
+[A] What does retrieval augmented generation combine?
+[A] What is the role of a retriever in RAG?
+[A] What is cosine similarity?
+[A] What is PyTorch?
+[A] What are transformers?
+
+[U] Who invented Python?
+[U] What is the capital of France?
+[U] Explain quantum entanglement.
+[U] What is Bayesian optimization?
+[U] What is backpropagation through time?
