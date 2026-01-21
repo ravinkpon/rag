@@ -1,4 +1,4 @@
-## RAG Pipeline Overview
+## RAG Pipeline with Evaluation
 
 <pre>
 Documents  ──▶  Chunks  ──▶  Embeddings  ──▶  Vector Search  ──▶  Reranker
@@ -13,7 +13,8 @@ Question   ──▶  Query Embedding  ─────────────�
 </pre>
 ---
 ## Project Structure
-<pre>
+
+```\
 .
 ├── data/
 │ ├── docs.txt # Knowledge base
@@ -21,7 +22,7 @@ Question   ──▶  Query Embedding  ─────────────�
 ├── rag_eval.py # Main RAG evaluation script
 ├── requirements.txt
 └── README.md
-</pre>
+```
 ---
 ## 📝 Question Format
 
@@ -44,14 +45,61 @@ Question   ──▶  Query Embedding  ─────────────�
 | LLM       | `gpt-4o-mini`                          | Answer generation  |
 
 ---
-f
 
-DOC_PATH = "data/docs.txt"
-QUESTION_PATH = "data/eval_questions.txt"
+## ⚙️ Installation
 
-docs.txt -> knowledge base
-eval_question.txt -> question to test your rag
+```bash
+pip install -r requirements.txt
+```
 
+### Set OpenAI API Key
 
-CHUNK_SIZE = 120
-OVERLAP = 30
+**Windows (PowerShell)**
+```powershell
+setx OPENAI_API_KEY "your_api_key_here"
+```
+
+**Linux / macOS**
+```bash
+export OPENAI_API_KEY="your_api_key_here"
+```
+
+---
+
+## ▶️ Run the Project
+
+```bash
+python main.py
+```
+
+The script will:
+- Embed documents
+- Retrieve and rerank context
+- Generate answers
+- Print evaluation results
+
+---
+
+## 📊 Evaluation Metrics
+
+### Answerable Questions
+- Correct answers
+- Failed answers
+- Retrieval HIT@K
+
+### Unanswerable Questions
+- Correct refusals
+- Hallucinations
+
+---
+
+## 🎯 Why This Project Matters
+
+This project demonstrates:
+- Proper document chunking
+- Two-stage retrieval (bi-encoder + cross-encoder)
+- Context-restricted generation
+- Hallucination detection
+- Practical RAG evaluation logic
+
+---
