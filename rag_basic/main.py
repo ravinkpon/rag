@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from tqdm import tqdm
 from sentence_transformers import SentenceTransformer, CrossEncoder
 from openai import OpenAI
+import torch
 
 # =========================
 # Load env
@@ -14,16 +15,28 @@ load_dotenv()
 # =========================
 # Providers
 # =========================
-EMBEDDING_PROVIDER = "modelscope"   # local | openai | modelscope | ollama
-RERANKER_PROVIDER  = "modelscope"        # local | modelscope
-LLM_PROVIDER       = "openai"       # ollama | openai | modelscope
+EMBEDDING_PROVIDER = "local"   # local | openai | modelscope | ollama
+RERANKER_PROVIDER = "local"        # local | modelscope
+LLM_PROVIDER = "openai"       # ollama | openai | modelscope
 
 # =========================
-# Models
+# Local embedding config
 # =========================
-EMBEDDING_MODEL = "Qwen/Qwen3-Embedding-8B"
-RERANKER_MODEL  = "Qwen/Qwen3-Reranker-8B"#"cross-encoder/ms-marco-MiniLM-L-6-v2"
-LLM_MODEL       = "gpt-4o-mini"   # ollama model OR gpt-4o-mini etc
+LOCAL_EMBEDDING_MODEL = "google/embeddinggemma-300m"
+LOCAL_EMBEDDING_DEVICE = "auto"  # auto | cpu | cuda
+
+# =========================
+# Local reranker config
+# =========================
+LOCAL_RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+LOCAL_RERANKER_DEVICE = "auto"  # auto | cpu | cuda
+
+# =========================
+# Models config for api
+# =========================
+EMBEDDING_MODEL = "text-embedding-3-small"  #"Qwen/Qwen3-Embedding-4B"
+RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2" #"Qwen/Qwen3-Reranker-8B" # "cross-encoder/ms-marco-MiniLM-L-6-v2"
+LLM_MODEL = "gpt-4o-mini"  #"gpt-4o-mini"   # ollama model OR gpt-4o-mini etc
 
 # =========================
 # Data
@@ -61,11 +74,38 @@ print(f"✅ Using LLM provider: {LLM_PROVIDER}")
 print(f"Model        : {LLM_MODEL}")
 
 # =========================
+# cpu/gpu check
+# =========================
+
+def resolve_device(device_pref: str):
+    if device_pref == "auto":
+        if torch.cuda.is_available():
+            return "cuda"
+        elif torch.backends.mps.is_available():
+            return "mps"
+        else:
+            return "cpu"
+    return device_pref
+
+
+# =========================
 # Embedding backend
 # =========================
+
+
 def init_embedder():
     if EMBEDDING_PROVIDER == "local":
-        return SentenceTransformer("google/embeddinggemma-300m", trust_remote_code=True)
+        device = resolve_device(LOCAL_EMBEDDING_DEVICE)
+
+        print(f"📦 Loading local embedding model:")
+        print(f"   Model  : {LOCAL_EMBEDDING_MODEL}")
+        print(f"   Device : {device}")
+
+        return SentenceTransformer(
+            LOCAL_EMBEDDING_MODEL,
+            device=device,
+            trust_remote_code=True
+        )
 
     elif EMBEDDING_PROVIDER == "openai":
         return OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -85,7 +125,9 @@ def init_embedder():
     else:
         raise ValueError("Invalid EMBEDDING_PROVIDER")
 
+
 embedder = init_embedder()
+
 
 def embed_texts(texts):
     if EMBEDDING_PROVIDER == "local":
@@ -101,9 +143,20 @@ def embed_texts(texts):
 # =========================
 # Reranker backend
 # =========================
+
+
 def init_reranker():
     if RERANKER_PROVIDER == "local":
-        return CrossEncoder(RERANKER_MODEL)
+        device = resolve_device(LOCAL_RERANKER_DEVICE)
+
+        print(f"📦 Loading local reranker model:")
+        print(f"   Model  : {LOCAL_RERANKER_MODEL}")
+        print(f"   Device : {device}")
+
+        return CrossEncoder(
+            LOCAL_RERANKER_MODEL,
+            device=device
+        )
 
     elif RERANKER_PROVIDER == "modelscope":
         return OpenAI(
@@ -114,7 +167,9 @@ def init_reranker():
     else:
         raise ValueError("Invalid RERANKER_PROVIDER")
 
+
 reranker = init_reranker()
+
 
 def rerank(query, documents, candidate_idx, top_k):
     if RERANKER_PROVIDER == "local":
@@ -122,7 +177,8 @@ def rerank(query, documents, candidate_idx, top_k):
         scores = reranker.predict(pairs)
 
     else:
-        inputs = [f"Query: {query}\nDocument: {documents[i]}" for i in candidate_idx]
+        inputs = [
+            f"Query: {query}\nDocument: {documents[i]}" for i in candidate_idx]
         resp = reranker.embeddings.create(model=RERANKER_MODEL, input=inputs)
         scores = [np.mean(d.embedding) for d in resp.data]
 
@@ -132,6 +188,8 @@ def rerank(query, documents, candidate_idx, top_k):
 # =========================
 # Utilities
 # =========================
+
+
 def chunk_text(text, chunk_size, overlap):
     words = text.split()
     chunks, i = [], 0
@@ -140,9 +198,11 @@ def chunk_text(text, chunk_size, overlap):
         i += chunk_size - overlap
     return chunks
 
+
 def retrieve_candidates(query_emb, doc_embs, k):
     scores = np.dot(doc_embs, query_emb)
     return np.argsort(scores)[-k:][::-1]
+
 
 def build_prompt(context, question):
     return f"""
@@ -159,6 +219,7 @@ Question:
 {question}
 """.strip()
 
+
 def ask_llm(prompt):
     resp = llm_client.chat.completions.create(
         model=LLM_MODEL,
@@ -167,6 +228,7 @@ def ask_llm(prompt):
         max_tokens=300,
     )
     return resp.choices[0].message.content
+
 
 # =========================
 # Load data
@@ -190,7 +252,9 @@ with open(QUESTION_PATH) as f:
 # Embed docs
 # =========================
 print("Embedding documents...")
-def embed_texts(texts, batch_size=16):
+
+
+def embed_texts(texts, batch_size=8):
     all_embeddings = []
 
     for i in tqdm(range(0, len(texts), batch_size), desc="Embedding batches"):
@@ -210,6 +274,7 @@ def embed_texts(texts, batch_size=16):
 
     return np.array(all_embeddings)
 
+
 doc_embeddings = embed_texts(documents, batch_size=8)
 
 
@@ -221,7 +286,6 @@ results = {
     "answerable": dict(total=0, correct=0, fail=0, retrieval_hit=0),
     "unanswerable": dict(total=0, correct_refusal=0, hallucination=0),
 }
-
 
 
 for raw_q in tqdm(questions, desc="Processing Questions"):
@@ -282,7 +346,8 @@ print(f"\nAnswerable questions: {a['total']}")
 print(f"Correct answers: {a['correct']}")
 print(f"Failed answers: {a['fail']}")
 if a['total'] > 0:
-    print(f"Retrieval HIT@{FINAL_TOP_K}: {a['retrieval_hit']} / {a['total']} ({a['retrieval_hit']/a['total']:.1%})")
+    print(
+        f"Retrieval HIT@{FINAL_TOP_K}: {a['retrieval_hit']} / {a['total']} ({a['retrieval_hit']/a['total']:.1%})")
 
 print(f"\nUnanswerable questions: {u['total']}")
 print(f"Correct refusals: {u['correct_refusal']}")
