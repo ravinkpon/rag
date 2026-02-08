@@ -1,0 +1,58 @@
+# =========================
+# Providers
+# =========================
+providers:
+  embedding: local        # local | openai | modelscope | ollama
+  reranker: local         # local | modelscope
+  llm: ollama             # ollama | openai | modelscope
+
+# =========================
+# Local model configuration
+# =========================
+local:
+  embedding_model: google/embeddinggemma-300m
+  embedding_device: auto      # auto | cpu | cuda
+
+  reranker_model: cross-encoder/ms-marco-MiniLM-L-6-v2
+  reranker_device: auto       # auto | cpu | cuda
+
+# =========================
+# API / Ollama model configuration
+# =========================
+api:
+  embedding_model: text-embedding-3-small
+  reranker_model: Qwen/Qwen3-Reranker-4B
+  llm_model: qwen3:4b         # gpt-4o-mini | qwen3:4b | others
+
+# =========================
+# Data paths
+# =========================
+paths:
+  docs: data/docs.txt
+  questions: data/eval_questions.txt
+
+# =========================
+# Chunking configuration
+# =========================
+chunking:
+  size: 300
+  overlap: 60
+
+# =========================
+# Retrieval configuration
+# =========================
+retrieval:
+  initial_top_k: 15
+  final_top_k: 3
+
+# =========================
+# LLM generation settings
+# =========================
+llm:
+  temperature: 0.2
+  top_p: 0.9
+  max_tokens: 300
+
+  # Only used for local / Ollama models
+  repeat_penalty: 1.1
+

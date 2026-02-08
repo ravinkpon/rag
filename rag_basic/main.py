@@ -6,48 +6,67 @@ from tqdm import tqdm
 from sentence_transformers import SentenceTransformer, CrossEncoder
 from openai import OpenAI
 import torch
+import yaml
 
 # =========================
 # Load env
 # =========================
 load_dotenv()
 
+with open("config.yaml", "r") as f:
+    cfg = yaml.safe_load(f)
+
 # =========================
 # Providers
 # =========================
-EMBEDDING_PROVIDER = "local"   # local | openai | modelscope | ollama
-RERANKER_PROVIDER = "local"        # local | modelscope
-LLM_PROVIDER = "openai"       # ollama | openai | modelscope
+EMBEDDING_PROVIDER = cfg["providers"]["embedding"]
+RERANKER_PROVIDER  = cfg["providers"]["reranker"]
+LLM_PROVIDER       = cfg["providers"]["llm"]
 
 # =========================
 # Local embedding config
 # =========================
-LOCAL_EMBEDDING_MODEL = "google/embeddinggemma-300m"
-LOCAL_EMBEDDING_DEVICE = "auto"  # auto | cpu | cuda
+LOCAL_EMBEDDING_MODEL  = cfg["local"]["embedding_model"]
+LOCAL_EMBEDDING_DEVICE = cfg["local"]["embedding_device"]
+
 
 # =========================
 # Local reranker config
 # =========================
-LOCAL_RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
-LOCAL_RERANKER_DEVICE = "auto"  # auto | cpu | cuda
+LOCAL_RERANKER_MODEL  = cfg["local"]["reranker_model"]
+LOCAL_RERANKER_DEVICE = cfg["local"]["reranker_device"]
 
 # =========================
-# Models config for api
+# Models config for api / ollama
 # =========================
-EMBEDDING_MODEL = "text-embedding-3-small"  #"Qwen/Qwen3-Embedding-4B"
-RERANKER_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2" #"Qwen/Qwen3-Reranker-8B" # "cross-encoder/ms-marco-MiniLM-L-6-v2"
-LLM_MODEL = "gpt-4o-mini"  #"gpt-4o-mini"   # ollama model OR gpt-4o-mini etc
+EMBEDDING_MODEL = cfg["api"]["embedding_model"]
+RERANKER_MODEL  = cfg["api"]["reranker_model"]
+LLM_MODEL       = cfg["api"]["llm_model"]
 
 # =========================
 # Data
 # =========================
-DOC_PATH = "data/docs.txt"
-QUESTION_PATH = "data/eval_questions.txt"
+DOC_PATH      = cfg["paths"]["docs"]
+QUESTION_PATH = cfg["paths"]["questions"]
 
-CHUNK_SIZE = 120
-OVERLAP = 30
-INITIAL_TOP_K = 15
-FINAL_TOP_K = 3
+# =========================
+# Chunking & Retrieval
+# =========================
+CHUNK_SIZE    = cfg["chunking"]["size"]
+OVERLAP       = cfg["chunking"]["overlap"]
+
+INITIAL_TOP_K = cfg["retrieval"]["initial_top_k"]
+FINAL_TOP_K   = cfg["retrieval"]["final_top_k"]
+
+# =========================
+# LLM generation settings
+# =========================
+
+LLM_TEMPERATURE    = cfg["llm"]["temperature"]
+LLM_TOP_P          = cfg["llm"]["top_p"]
+LLM_MAX_TOKENS     = cfg["llm"]["max_tokens"]
+LLM_REPEAT_PENALTY = cfg["llm"]["repeat_penalty"]
+
 
 # =========================
 # LLM Client
@@ -203,30 +222,56 @@ def retrieve_candidates(query_emb, doc_embs, k):
     scores = np.dot(doc_embs, query_emb)
     return np.argsort(scores)[-k:][::-1]
 
+# Answer the question using ONLY the context below.
+
+# Context:
+# {context}
+
+# Rules:
+# - Use only the context
+# - If missing answer say: NOT IN CONTEXT
+
+# Question:
+# {question}
 
 def build_prompt(context, question):
     return f"""
-Answer the question using ONLY the context below.
+
+You are a question-answering assistant.
+
+Rules:
+1. Use ONLY the information in the provided context.
+2. If the answer is not in the context, say: "I don't know based on the provided context."
+3. Do NOT use prior knowledge.
+4. Be concise and factual.
 
 Context:
 {context}
 
-Rules:
-- Use only the context
-- If missing answer say: NOT IN CONTEXT
-
 Question:
 {question}
+
+Answer:
+
 """.strip()
 
 
 def ask_llm(prompt):
-    resp = llm_client.chat.completions.create(
-        model=LLM_MODEL,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0,
-        max_tokens=300,
-    )
+    kwargs = {
+        "model": LLM_MODEL,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": LLM_TEMPERATURE,
+        "top_p": LLM_TOP_P,
+        "max_tokens": LLM_MAX_TOKENS,
+    }
+
+    # Ollama / local models only
+    if LLM_PROVIDER == "ollama":
+        kwargs["extra_body"] = {
+            "repeat_penalty": LLM_REPEAT_PENALTY
+        }
+
+    resp = llm_client.chat.completions.create(**kwargs)
     return resp.choices[0].message.content
 
 

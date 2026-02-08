@@ -5,7 +5,7 @@ Documents  ──▶  Chunks  ──▶  Embeddings  ──▶  Vector Search  �
                                                          │
 Question   ──▶  Query Embedding  ─────────────────────────┘
                                                          │
-                                                     Top-3 Context
+                                                     Top-K Context
                                                          │
                                                       LLM Answer
                                                          │
@@ -22,6 +22,7 @@ Question   ──▶  Query Embedding  ─────────────�
 ├── rag_eval.py # Main RAG evaluation script
 ├── requirements.txt
 └── README.md
+└── .env # create the file and follow instruction below
 ```
 ---
 ## 📝 Question Format
@@ -44,6 +45,7 @@ Question   ──▶  Query Embedding  ─────────────�
 | Reranker  | `cross-encoder/ms-marco-MiniLM-L-6-v2` | Precise ranking    |
 | LLM       | `gpt-4o-mini`                          | Answer generation  |
 
+you can choose your own model 
 ---
 
 ## ⚙️ Installation
@@ -52,19 +54,31 @@ Question   ──▶  Query Embedding  ─────────────�
 pip install -r requirements.txt
 ```
 
-### Set OpenAI API Key
+## Set API Key 
 
-**Windows (PowerShell)**
-```powershell
-setx OPENAI_API_KEY "your_api_key_here"
+Create .env file in the Project root 
+paste this and change with you key
 ```
+OPENAI_API_KEY="sk-proj-.....................wOUA"
+MODELSCOPE_API_KEY="ms-6a..................5b"
+OLLAMA_BASE_URL=http://localhost:11434/v1
+```
+---
 
-**Linux / macOS**
-```bash
-export OPENAI_API_KEY="your_api_key_here"
-```
+## ⚙️ Configuration File
+
+All models, providers, and generation settings are controlled through a single `config.yaml` file.\
+The code reads settings from `config.yaml` at runtime \
+This allows you to:
+
+* switch between local and cloud models
+* change embedding, reranker, or LLM models
+* tune chunking, retrieval, and generation parameters
+* experiment without modifying the Python code
+
 
 ---
+
 
 ## ▶️ Run the Project
 
