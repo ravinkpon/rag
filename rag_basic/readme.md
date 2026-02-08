@@ -50,6 +50,7 @@ you can choose your own model
 
 ## ⚙️ Installation
 
+Make sure Python is 3.12.8 
 ```bash
 pip install -r requirements.txt
 ```
